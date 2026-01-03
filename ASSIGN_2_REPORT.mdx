@@ -1,0 +1,1372 @@
+# Sekuwa Kerner - Project Report
+## E-Commerce Food Ordering System with PHP & MySQL
+
+---
+
+## Table of Contents
+
+1. [Introduction](#1-introduction)
+2. [Database Description](#2-database-description)
+3. [Entity-Relationship Diagram](#3-entity-relationship-diagram)
+4. [Relational Schema](#4-relational-schema)
+5. [SQL Statements with PHP Integration](#5-sql-statements-with-php-integration)
+   - 5.1 [Create Database](#51-create-database)
+   - 5.2 [Create Tables](#52-create-tables)
+   - 5.3 [ALTER Query Statements](#53-alter-query-statements)
+   - 5.4 [CRUD Operations](#54-crud-operations)
+   - 5.5 [User Registration and Login](#55-user-registration-and-login)
+6. [Admin and Customer Dashboard](#6-admin-and-customer-dashboard)
+7. [Summary](#7-summary)
+8. [Conclusion](#8-conclusion)
+
+---
+
+## 1. Introduction
+
+### Project Overview
+
+**Sekuwa Kerner** is a comprehensive e-commerce web application designed for a Nepali food ordering platform. The system specializes in traditional Nepali grilled food items known as "Sekuwa" - a popular street food delicacy in Nepal.
+
+### Purpose
+
+The primary purpose of this project is to create a fully functional online food ordering system that enables:
+
+- **Customers** to browse menu items, add products to cart, place orders, and track order status
+- **Administrators** to manage products, process orders, and view business reports
+
+### Technologies Used
+
+| Technology | Purpose |
+|------------|---------|
+| **PHP 8.x** | Server-side scripting language |
+| **MySQL** | Relational database management system |
+| **HTML5** | Frontend structure |
+| **CSS3** | Styling and responsive design |
+| **JavaScript** | Client-side interactivity |
+| **XAMPP** | Local development environment |
+
+### Key Features
+
+1. **User Authentication System** - Registration, login, and role-based access control
+2. **Product Management** - Full CRUD operations for food items
+3. **Shopping Cart** - Session-based cart functionality
+4. **Order Processing** - Complete order lifecycle management
+5. **Payment Integration** - Support for multiple payment methods (Cash on Delivery, eSewa, Khalti)
+6. **Admin Dashboard** - Statistics, order management, and reports
+7. **Customer Dashboard** - Order history and tracking
+
+---
+
+## 2. Database Description
+
+### Database Name: `sekuwa_kerner`
+
+The database is designed following normalization principles to ensure data integrity, minimize redundancy, and maintain efficient relationships between entities.
+
+### Tables Overview
+
+| Table Name | Description | Total Columns |
+|------------|-------------|---------------|
+| `users` | Stores customer and admin account information | 7 |
+| `categories` | Product categories (Chicken Sekuwa, Buff Sekuwa, etc.) | 4 |
+| `products` | All food items available for ordering | 9 |
+| `orders` | Customer orders with delivery details | 9 |
+| `order_items` | Individual items in each order (many-to-many resolution) | 5 |
+| `payments` | Payment information for each order | 6 |
+
+### Data Types Used
+
+- **INT** - For primary keys and foreign keys
+- **VARCHAR** - For strings with known maximum length
+- **TEXT** - For longer text content (descriptions, addresses)
+- **DECIMAL(10,2)** - For monetary values (prices)
+- **ENUM** - For predefined value sets (status, roles)
+- **TIMESTAMP** - For date and time tracking
+- **TINYINT(1)** - For boolean flags
+
+---
+
+## 3. Entity-Relationship Diagram
+
+### ER Diagram Description
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────┐
+│                         ENTITY-RELATIONSHIP DIAGRAM                             │
+│                            Sekuwa Kerner Database                               │
+└─────────────────────────────────────────────────────────────────────────────────┘
+
+                              ┌────────────────┐
+                              │     USERS      │
+                              ├────────────────┤
+                              │ PK: id         │
+                              │ name           │
+                              │ email (UNIQUE) │
+                              │ phone          │
+                              │ password       │
+                              │ role           │
+                              │ created_at     │
+                              └───────┬────────┘
+                                      │
+                                      │ 1
+                                      │
+                                      │ places
+                                      │
+                                      │ M
+                                      ▼
+    ┌────────────────┐          ┌────────────────┐          ┌────────────────┐
+    │   CATEGORIES   │          │     ORDERS     │          │    PAYMENTS    │
+    ├────────────────┤          ├────────────────┤          ├────────────────┤
+    │ PK: id         │          │ PK: id         │          │ PK: id         │
+    │ name           │          │ FK: user_id    │◄────────►│ FK: order_id   │
+    │ description    │          │ total_price    │    1:1   │ payment_method │
+    │ created_at     │          │ address        │          │ payment_status │
+    └───────┬────────┘          │ phone          │          │ transaction_id │
+            │                   │ status         │          │ created_at     │
+            │ 1                 │ notes          │          └────────────────┘
+            │                   │ created_at     │
+            │ has              │ updated_at     │
+            │                   └───────┬────────┘
+            │ M                         │
+            ▼                           │ 1
+    ┌────────────────┐                  │
+    │    PRODUCTS    │                  │ contains
+    ├────────────────┤                  │
+    │ PK: id         │                  │ M
+    │ FK: category_id│                  ▼
+    │ name           │          ┌────────────────┐
+    │ price          │          │  ORDER_ITEMS   │
+    │ description    │◄─────────┤────────────────┤
+    │ image          │    M:M   │ PK: id         │
+    │ is_featured    │ resolved │ FK: order_id   │
+    │ is_available   │          │ FK: product_id │
+    │ created_at     │          │ quantity       │
+    └────────────────┘          │ price          │
+                                └────────────────┘
+
+
+RELATIONSHIP SUMMARY:
+━━━━━━━━━━━━━━━━━━━━━
+• USERS (1) ──────► (M) ORDERS        : One user can place many orders
+• CATEGORIES (1) ──► (M) PRODUCTS     : One category contains many products
+• ORDERS (1) ──────► (M) ORDER_ITEMS  : One order has many order items
+• PRODUCTS (1) ────► (M) ORDER_ITEMS  : One product can be in many order items
+• ORDERS (1) ──────► (1) PAYMENTS     : One order has one payment record
+
+CARDINALITY NOTATION:
+━━━━━━━━━━━━━━━━━━━━━
+• 1:M  = One-to-Many
+• M:M  = Many-to-Many (resolved through ORDER_ITEMS junction table)
+• 1:1  = One-to-One
+```
+
+### Entity Relationships Explained
+
+1. **Users → Orders (1:M)**
+   - One user can place multiple orders
+   - Each order belongs to exactly one user
+   - `user_id` in orders references `id` in users
+
+2. **Categories → Products (1:M)**
+   - One category can have multiple products
+   - Each product belongs to one category
+   - `category_id` in products references `id` in categories
+
+3. **Orders → Order_Items (1:M)**
+   - One order can contain multiple items
+   - Each order item belongs to one order
+   - `order_id` in order_items references `id` in orders
+
+4. **Products → Order_Items (1:M)**
+   - One product can appear in multiple order items
+   - Each order item references one product
+   - `product_id` in order_items references `id` in products
+
+5. **Orders → Payments (1:1)**
+   - Each order has one payment record
+   - `order_id` in payments references `id` in orders
+
+---
+
+## 4. Relational Schema
+
+### Schema Diagram
+
+```
+USERS (id*, name, email, phone, password, role, created_at)
+
+CATEGORIES (id*, name, description, created_at)
+
+PRODUCTS (id*, name, price, description, category_id**, image, is_featured, is_available, created_at)
+          └── category_id** → CATEGORIES(id)
+
+ORDERS (id*, user_id**, total_price, address, phone, status, notes, created_at, updated_at)
+        └── user_id** → USERS(id)
+
+ORDER_ITEMS (id*, order_id**, product_id**, quantity, price)
+             ├── order_id** → ORDERS(id)
+             └── product_id** → PRODUCTS(id)
+
+PAYMENTS (id*, order_id**, payment_method, payment_status, transaction_id, created_at)
+          └── order_id** → ORDERS(id)
+
+LEGEND:
+  * Primary Key (PK)
+  ** Foreign Key (FK)
+```
+
+### Attribute Details
+
+#### USERS Table
+| Attribute | Data Type | Constraints | Description |
+|-----------|-----------|-------------|-------------|
+| id | INT | PRIMARY KEY, AUTO_INCREMENT | Unique user identifier |
+| name | VARCHAR(100) | NOT NULL | User's full name |
+| email | VARCHAR(100) | NOT NULL, UNIQUE | User's email address |
+| phone | VARCHAR(20) | - | Contact phone number |
+| password | VARCHAR(255) | NOT NULL | Hashed password |
+| role | ENUM | DEFAULT 'customer' | User role (customer/admin) |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Registration date |
+
+#### CATEGORIES Table
+| Attribute | Data Type | Constraints | Description |
+|-----------|-----------|-------------|-------------|
+| id | INT | PRIMARY KEY, AUTO_INCREMENT | Unique category identifier |
+| name | VARCHAR(100) | NOT NULL | Category name |
+| description | TEXT | - | Category description |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Creation date |
+
+#### PRODUCTS Table
+| Attribute | Data Type | Constraints | Description |
+|-----------|-----------|-------------|-------------|
+| id | INT | PRIMARY KEY, AUTO_INCREMENT | Unique product identifier |
+| name | VARCHAR(200) | NOT NULL | Product name |
+| price | DECIMAL(10,2) | NOT NULL | Product price |
+| description | TEXT | - | Product description |
+| category_id | INT | FOREIGN KEY | Reference to categories |
+| image | VARCHAR(255) | DEFAULT 'default.jpg' | Product image filename |
+| is_featured | TINYINT(1) | DEFAULT 0 | Featured flag |
+| is_available | TINYINT(1) | DEFAULT 1 | Availability flag |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Creation date |
+
+#### ORDERS Table
+| Attribute | Data Type | Constraints | Description |
+|-----------|-----------|-------------|-------------|
+| id | INT | PRIMARY KEY, AUTO_INCREMENT | Unique order identifier |
+| user_id | INT | FOREIGN KEY, NOT NULL | Reference to users |
+| total_price | DECIMAL(10,2) | NOT NULL | Total order amount |
+| address | TEXT | NOT NULL | Delivery address |
+| phone | VARCHAR(20) | NOT NULL | Contact phone |
+| status | ENUM | DEFAULT 'Pending' | Order status |
+| notes | TEXT | - | Special instructions |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Order date |
+| updated_at | TIMESTAMP | ON UPDATE CURRENT_TIMESTAMP | Last update date |
+
+#### ORDER_ITEMS Table
+| Attribute | Data Type | Constraints | Description |
+|-----------|-----------|-------------|-------------|
+| id | INT | PRIMARY KEY, AUTO_INCREMENT | Unique item identifier |
+| order_id | INT | FOREIGN KEY, NOT NULL | Reference to orders |
+| product_id | INT | FOREIGN KEY, NOT NULL | Reference to products |
+| quantity | INT | NOT NULL, DEFAULT 1 | Item quantity |
+| price | DECIMAL(10,2) | NOT NULL | Price at time of order |
+
+#### PAYMENTS Table
+| Attribute | Data Type | Constraints | Description |
+|-----------|-----------|-------------|-------------|
+| id | INT | PRIMARY KEY, AUTO_INCREMENT | Unique payment identifier |
+| order_id | INT | FOREIGN KEY, NOT NULL | Reference to orders |
+| payment_method | ENUM | NOT NULL | Payment method used |
+| payment_status | ENUM | DEFAULT 'Pending' | Payment status |
+| transaction_id | VARCHAR(100) | - | External transaction ID |
+| created_at | TIMESTAMP | DEFAULT CURRENT_TIMESTAMP | Payment date |
+
+---
+
+## 5. SQL Statements with PHP Integration
+
+### 5.1 Create Database
+
+#### SQL Statement
+
+```sql
+-- Create the database
+CREATE DATABASE IF NOT EXISTS sekuwa_kerner;
+
+-- Use the database
+USE sekuwa_kerner;
+```
+
+#### PHP Database Connection (config/db.php)
+
+```php
+<?php
+/**
+ * DATABASE CONFIGURATION
+ * Sekuwa Kerner - Nepali Food Ordering Platform
+ */
+
+// Database credentials
+define('DB_HOST', 'localhost');
+define('DB_USER', 'root');
+define('DB_PASS', '');
+define('DB_NAME', 'sekuwa_kerner');
+
+// Site configuration
+define('SITE_NAME', 'Sekuwa Kerner');
+define('SITE_URL', 'http://localhost/sekuwa-kerner');
+
+/**
+ * Create database connection using MySQLi
+ * We use mysqli for prepared statements to prevent SQL injection
+ */
+$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
+
+// Check if connection was successful
+if ($conn->connect_error) {
+    error_log("Database connection failed: " . $conn->connect_error);
+    die("Connection failed. Please check if MySQL is running.");
+}
+
+// Set charset to UTF-8 for proper character handling
+$conn->set_charset("utf8mb4");
+
+/**
+ * Helper function to sanitize user input
+ */
+function sanitize($conn, $data) {
+    return htmlspecialchars(strip_tags(trim($conn->real_escape_string($data))));
+}
+?>
+```
+
+---
+
+### 5.2 Create Tables
+
+#### Users Table
+
+```sql
+-- USERS TABLE: Stores customer and admin accounts
+CREATE TABLE users (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    phone VARCHAR(20),
+    password VARCHAR(255) NOT NULL,
+    role ENUM('customer', 'admin') DEFAULT 'customer',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+```
+
+#### Categories Table
+
+```sql
+-- CATEGORIES TABLE: Product categories
+CREATE TABLE categories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+```
+
+#### Products Table
+
+```sql
+-- PRODUCTS TABLE: All food items available for ordering
+CREATE TABLE products (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    name VARCHAR(200) NOT NULL,
+    price DECIMAL(10, 2) NOT NULL,
+    description TEXT,
+    category_id INT NOT NULL,
+    image VARCHAR(255) DEFAULT 'default.jpg',
+    is_featured TINYINT(1) DEFAULT 0,
+    is_available TINYINT(1) DEFAULT 1,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+```
+
+#### Orders Table
+
+```sql
+-- ORDERS TABLE: Customer orders with delivery details
+CREATE TABLE orders (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    user_id INT NOT NULL,
+    total_price DECIMAL(10, 2) NOT NULL,
+    address TEXT NOT NULL,
+    phone VARCHAR(20) NOT NULL,
+    status ENUM('Pending', 'Cooking', 'Out for Delivery', 'Delivered', 'Cancelled') DEFAULT 'Pending',
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+```
+
+#### Order Items Table
+
+```sql
+-- ORDER_ITEMS TABLE: Individual items in each order
+CREATE TABLE order_items (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    product_id INT NOT NULL,
+    quantity INT NOT NULL DEFAULT 1,
+    price DECIMAL(10, 2) NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+```
+
+#### Payments Table
+
+```sql
+-- PAYMENTS TABLE: Payment information for each order
+CREATE TABLE payments (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    order_id INT NOT NULL,
+    payment_method ENUM('Cash on Delivery', 'eSewa', 'Khalti') NOT NULL,
+    payment_status ENUM('Pending', 'Completed', 'Failed') DEFAULT 'Pending',
+    transaction_id VARCHAR(100),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+```
+
+---
+
+### 5.3 ALTER Query Statements
+
+#### Creating Indexes for Better Performance
+
+```sql
+-- Index on products for category filtering
+CREATE INDEX idx_products_category ON products(category_id);
+
+-- Index on orders for user lookup
+CREATE INDEX idx_orders_user ON orders(user_id);
+
+-- Index on orders for status filtering
+CREATE INDEX idx_orders_status ON orders(status);
+
+-- Index on order_items for order lookup
+CREATE INDEX idx_order_items_order ON order_items(order_id);
+```
+
+#### Sample ALTER TABLE Statements (If needed for modifications)
+
+```sql
+-- Add a new column to users table (example)
+ALTER TABLE users ADD COLUMN address TEXT AFTER phone;
+
+-- Modify column type (example)
+ALTER TABLE products MODIFY COLUMN price DECIMAL(12, 2) NOT NULL;
+
+-- Add a new foreign key constraint (example)
+ALTER TABLE order_items 
+ADD CONSTRAINT fk_order_items_order 
+FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE;
+
+-- Drop a column (example)
+ALTER TABLE users DROP COLUMN address;
+
+-- Rename a column (example)
+ALTER TABLE users CHANGE COLUMN phone contact_phone VARCHAR(20);
+```
+
+---
+
+### 5.4 CRUD Operations
+
+#### CREATE Operation - Adding a New Product
+
+**SQL Statement:**
+```sql
+INSERT INTO products (name, price, description, category_id, image, is_featured, is_available) 
+VALUES (?, ?, ?, ?, ?, ?, ?);
+```
+
+**PHP Implementation (admin/add_product.php):**
+
+```php
+<?php
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Get form data
+    $name = sanitize($conn, $_POST['name'] ?? '');
+    $description = sanitize($conn, $_POST['description'] ?? '');
+    $price = floatval($_POST['price'] ?? 0);
+    $category_id = intval($_POST['category_id'] ?? 0);
+    $is_featured = isset($_POST['is_featured']) ? 1 : 0;
+    $is_available = isset($_POST['is_available']) ? 1 : 0;
+    
+    // Handle image upload
+    $image_name = 'default.jpg';
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $file_type = $_FILES['image']['type'];
+        
+        if (in_array($file_type, $allowed_types)) {
+            $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+            $image_name = 'product_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
+            $upload_path = '../assets/images/' . $image_name;
+            move_uploaded_file($_FILES['image']['tmp_name'], $upload_path);
+        }
+    }
+    
+    // Prepared statement to prevent SQL injection
+    $stmt = $conn->prepare("INSERT INTO products (name, price, description, category_id, image, is_featured, is_available) 
+                            VALUES (?, ?, ?, ?, ?, ?, ?)");
+    $stmt->bind_param("sdsissi", $name, $price, $description, $category_id, $image_name, $is_featured, $is_available);
+    
+    if ($stmt->execute()) {
+        setFlashMessage('success', 'Product added successfully!');
+        redirect('products.php');
+    }
+}
+?>
+```
+
+---
+
+#### READ Operation - Displaying Products in HTML Table
+
+**SQL Statement:**
+```sql
+SELECT p.*, c.name as category_name 
+FROM products p 
+JOIN categories c ON p.category_id = c.id 
+WHERE p.is_available = 1
+ORDER BY p.name ASC;
+```
+
+**PHP Implementation with HTML Table (admin/products.php):**
+
+```php
+<?php
+require_once 'admin_auth.php';
+
+// Build query with filters
+$category_filter = isset($_GET['category']) ? intval($_GET['category']) : 0;
+$search = isset($_GET['search']) ? sanitize($conn, $_GET['search']) : '';
+
+$sql = "SELECT p.*, c.name as category_name 
+        FROM products p 
+        JOIN categories c ON p.category_id = c.id 
+        WHERE 1=1";
+
+$params = [];
+$types = "";
+
+if ($category_filter > 0) {
+    $sql .= " AND p.category_id = ?";
+    $params[] = $category_filter;
+    $types .= "i";
+}
+
+if (!empty($search)) {
+    $sql .= " AND p.name LIKE ?";
+    $params[] = "%{$search}%";
+    $types .= "s";
+}
+
+$sql .= " ORDER BY p.created_at DESC";
+
+// Execute query with prepared statement
+$stmt = $conn->prepare($sql);
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+$stmt->execute();
+$products = $stmt->get_result();
+?>
+
+<!-- HTML5 Table Structure with PHP Loop -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Products</title>
+</head>
+<body>
+    <main>
+        <h1>Manage Products</h1>
+        
+        <!-- Products Table -->
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Image</th>
+                    <th>Name</th>
+                    <th>Category</th>
+                    <th>Price</th>
+                    <th>Featured</th>
+                    <th>Available</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if ($products->num_rows > 0): ?>
+                    <?php while ($product = $products->fetch_assoc()): ?>
+                        <tr>
+                            <td><?php echo $product['id']; ?></td>
+                            <td>
+                                <img src="../assets/images/<?php echo htmlspecialchars($product['image']); ?>" 
+                                     alt="<?php echo htmlspecialchars($product['name']); ?>"
+                                     class="product-thumb"
+                                     onerror="this.src='../assets/images/default.jpg'">
+                            </td>
+                            <td><?php echo htmlspecialchars($product['name']); ?></td>
+                            <td><?php echo htmlspecialchars($product['category_name']); ?></td>
+                            <td>Rs. <?php echo number_format($product['price'], 2); ?></td>
+                            <td>
+                                <?php if ($product['is_featured']): ?>
+                                    <span class="badge badge-yes">Yes</span>
+                                <?php else: ?>
+                                    <span class="badge badge-no">No</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <?php if ($product['is_available']): ?>
+                                    <span class="badge badge-yes">Yes</span>
+                                <?php else: ?>
+                                    <span class="badge badge-no">No</span>
+                                <?php endif; ?>
+                            </td>
+                            <td>
+                                <a href="edit_product.php?id=<?php echo $product['id']; ?>" class="btn btn-small">Edit</a>
+                                <a href="delete_product.php?id=<?php echo $product['id']; ?>" class="btn btn-danger btn-small"
+                                   onclick="return confirm('Are you sure?')">Delete</a>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr>
+                        <td colspan="8" class="text-center">No products found</td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
+        
+        <p>Total: <?php echo $products->num_rows; ?> product(s)</p>
+    </main>
+</body>
+</html>
+```
+
+---
+
+#### UPDATE Operation - Editing a Product
+
+**SQL Statement:**
+```sql
+UPDATE products 
+SET name = ?, price = ?, description = ?, category_id = ?, image = ?, is_featured = ?, is_available = ? 
+WHERE id = ?;
+```
+
+**PHP Implementation (admin/edit_product.php):**
+
+```php
+<?php
+require_once 'admin_auth.php';
+
+// Get product ID
+$product_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+// Fetch existing product details
+$stmt = $conn->prepare("SELECT * FROM products WHERE id = ?");
+$stmt->bind_param("i", $product_id);
+$stmt->execute();
+$product = $stmt->get_result()->fetch_assoc();
+
+if (!$product) {
+    setFlashMessage('error', 'Product not found.');
+    redirect('products.php');
+}
+
+// Handle form submission
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $name = sanitize($conn, $_POST['name'] ?? '');
+    $description = sanitize($conn, $_POST['description'] ?? '');
+    $price = floatval($_POST['price'] ?? 0);
+    $category_id = intval($_POST['category_id'] ?? 0);
+    $is_featured = isset($_POST['is_featured']) ? 1 : 0;
+    $is_available = isset($_POST['is_available']) ? 1 : 0;
+    
+    // Handle image upload
+    $image_name = $product['image']; // Keep existing image by default
+    if (isset($_FILES['image']) && $_FILES['image']['error'] === UPLOAD_ERR_OK) {
+        $allowed_types = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        $file_type = $_FILES['image']['type'];
+        
+        if (in_array($file_type, $allowed_types)) {
+            $ext = pathinfo($_FILES['image']['name'], PATHINFO_EXTENSION);
+            $image_name = 'product_' . time() . '_' . rand(1000, 9999) . '.' . $ext;
+            $upload_path = '../assets/images/' . $image_name;
+            
+            if (move_uploaded_file($_FILES['image']['tmp_name'], $upload_path)) {
+                // Delete old image if not default
+                if ($product['image'] !== 'default.jpg' && file_exists('../assets/images/' . $product['image'])) {
+                    unlink('../assets/images/' . $product['image']);
+                }
+            }
+        }
+    }
+    
+    // UPDATE query with prepared statement
+    $stmt = $conn->prepare("UPDATE products 
+                            SET name = ?, price = ?, description = ?, category_id = ?, 
+                                image = ?, is_featured = ?, is_available = ? 
+                            WHERE id = ?");
+    $stmt->bind_param("sdsissii", $name, $price, $description, $category_id, 
+                      $image_name, $is_featured, $is_available, $product_id);
+    
+    if ($stmt->execute()) {
+        setFlashMessage('success', 'Product updated successfully!');
+        redirect('products.php');
+    }
+}
+?>
+```
+
+---
+
+#### DELETE Operation - Deleting a Product
+
+**SQL Statement:**
+```sql
+DELETE FROM products WHERE id = ?;
+```
+
+**PHP Implementation (admin/delete_product.php):**
+
+```php
+<?php
+require_once 'admin_auth.php';
+
+// Get product ID
+$product_id = isset($_GET['id']) ? intval($_GET['id']) : 0;
+
+if ($product_id <= 0) {
+    setFlashMessage('error', 'Invalid product ID.');
+    redirect('products.php');
+}
+
+// Fetch product to get image name
+$stmt = $conn->prepare("SELECT image FROM products WHERE id = ?");
+$stmt->bind_param("i", $product_id);
+$stmt->execute();
+$product = $stmt->get_result()->fetch_assoc();
+
+if (!$product) {
+    setFlashMessage('error', 'Product not found.');
+    redirect('products.php');
+}
+
+// DELETE query with prepared statement
+$delete_stmt = $conn->prepare("DELETE FROM products WHERE id = ?");
+$delete_stmt->bind_param("i", $product_id);
+
+if ($delete_stmt->execute()) {
+    // Delete product image if not default
+    if ($product['image'] !== 'default.jpg' && file_exists('../assets/images/' . $product['image'])) {
+        unlink('../assets/images/' . $product['image']);
+    }
+    
+    setFlashMessage('success', 'Product deleted successfully!');
+} else {
+    setFlashMessage('error', 'Failed to delete product.');
+}
+
+redirect('products.php');
+?>
+```
+
+---
+
+### 5.5 User Registration and Login
+
+#### User Registration
+
+**SQL Statement:**
+```sql
+-- Check if email already exists
+SELECT id FROM users WHERE email = ?;
+
+-- Insert new user
+INSERT INTO users (name, email, phone, password, role) 
+VALUES (?, ?, ?, ?, 'customer');
+```
+
+**PHP Implementation (auth/register.php):**
+
+```php
+<?php
+session_start();
+require_once '../config/db.php';
+
+// Redirect if already logged in
+if (isLoggedIn()) {
+    redirect('../index.php');
+}
+
+$name = '';
+$email = '';
+$phone = '';
+$errors = [];
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    // Sanitize input
+    $name = sanitize($conn, $_POST['name'] ?? '');
+    $email = sanitize($conn, $_POST['email'] ?? '');
+    $phone = sanitize($conn, $_POST['phone'] ?? '');
+    $password = $_POST['password'] ?? '';
+    $confirm_password = $_POST['confirm_password'] ?? '';
+    
+    // Validation
+    if (empty($name)) {
+        $errors[] = 'Name is required.';
+    } elseif (strlen($name) < 2) {
+        $errors[] = 'Name must be at least 2 characters.';
+    }
+    
+    if (empty($email)) {
+        $errors[] = 'Email is required.';
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $errors[] = 'Please enter a valid email address.';
+    } else {
+        // Check if email already exists
+        $stmt = $conn->prepare("SELECT id FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        if ($stmt->get_result()->num_rows > 0) {
+            $errors[] = 'This email is already registered.';
+        }
+        $stmt->close();
+    }
+    
+    if (!empty($phone) && !preg_match('/^[0-9]{10}$/', $phone)) {
+        $errors[] = 'Please enter a valid 10-digit phone number.';
+    }
+    
+    if (empty($password)) {
+        $errors[] = 'Password is required.';
+    } elseif (strlen($password) < 6) {
+        $errors[] = 'Password must be at least 6 characters.';
+    }
+    
+    if ($password !== $confirm_password) {
+        $errors[] = 'Passwords do not match.';
+    }
+    
+    // If no errors, insert user
+    if (empty($errors)) {
+        // Hash password using bcrypt
+        $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+        
+        // INSERT new user
+        $stmt = $conn->prepare("INSERT INTO users (name, email, phone, password, role) 
+                                VALUES (?, ?, ?, ?, 'customer')");
+        $stmt->bind_param("ssss", $name, $email, $phone, $hashed_password);
+        
+        if ($stmt->execute()) {
+            setFlashMessage('success', '🎉 Account created! Please login.');
+            redirect('login.php');
+        } else {
+            $errors[] = 'Registration failed. Please try again.';
+        }
+        
+        $stmt->close();
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Sign Up - Sekuwa Kerner</title>
+</head>
+<body>
+    <main class="auth-page">
+        <div class="auth-box">
+            <h1>Join the Feast!</h1>
+            
+            <?php if (!empty($errors)): ?>
+                <div class="alert alert-error">
+                    <ul>
+                        <?php foreach ($errors as $error): ?>
+                            <li>❌ <?php echo $error; ?></li>
+                        <?php endforeach; ?>
+                    </ul>
+                </div>
+            <?php endif; ?>
+            
+            <form action="register.php" method="POST" class="auth-form">
+                <div class="form-group">
+                    <label for="name">👤 Full Name *</label>
+                    <input type="text" id="name" name="name" 
+                           value="<?php echo htmlspecialchars($name); ?>" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="email">📧 Email Address *</label>
+                    <input type="email" id="email" name="email" 
+                           value="<?php echo htmlspecialchars($email); ?>" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="phone">📱 Phone Number (optional)</label>
+                    <input type="tel" id="phone" name="phone" 
+                           value="<?php echo htmlspecialchars($phone); ?>" pattern="[0-9]{10}">
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">🔒 Password *</label>
+                    <input type="password" id="password" name="password" minlength="6" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="confirm_password">🔒 Confirm Password *</label>
+                    <input type="password" id="confirm_password" name="confirm_password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">🚀 Create Account</button>
+            </form>
+            
+            <p>Already have an account? <a href="login.php">Sign in here</a></p>
+        </div>
+    </main>
+</body>
+</html>
+```
+
+---
+
+#### User Login
+
+**SQL Statement:**
+```sql
+SELECT id, name, email, password, role FROM users WHERE email = ?;
+```
+
+**PHP Implementation (auth/login.php):**
+
+```php
+<?php
+session_start();
+require_once '../config/db.php';
+
+// Redirect if already logged in
+if (isLoggedIn()) {
+    if (isAdmin()) {
+        redirect('../admin/dashboard.php');
+    } else {
+        redirect('../index.php');
+    }
+}
+
+$email = '';
+$error = '';
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    $email = sanitize($conn, $_POST['email'] ?? '');
+    $password = $_POST['password'] ?? '';
+    
+    if (empty($email) || empty($password)) {
+        $error = 'Please fill in all fields.';
+    } else {
+        // Fetch user by email using prepared statement
+        $stmt = $conn->prepare("SELECT id, name, email, password, role FROM users WHERE email = ?");
+        $stmt->bind_param("s", $email);
+        $stmt->execute();
+        $result = $stmt->get_result();
+        
+        if ($result->num_rows === 1) {
+            $user = $result->fetch_assoc();
+            
+            // Verify password using password_verify()
+            if (password_verify($password, $user['password'])) {
+                // Set session variables
+                $_SESSION['user_id'] = $user['id'];
+                $_SESSION['user_name'] = $user['name'];
+                $_SESSION['user_email'] = $user['email'];
+                $_SESSION['user_role'] = $user['role'];
+                
+                setFlashMessage('success', '🎉 Welcome back, ' . $user['name'] . '!');
+                
+                // Redirect based on role
+                if ($user['role'] === 'admin') {
+                    redirect('../admin/dashboard.php');
+                } else {
+                    // Check for redirect after login
+                    if (isset($_SESSION['redirect_after_login'])) {
+                        $redirect = $_SESSION['redirect_after_login'];
+                        unset($_SESSION['redirect_after_login']);
+                        redirect($redirect);
+                    } else {
+                        redirect('../index.php');
+                    }
+                }
+            } else {
+                $error = 'Invalid email or password.';
+            }
+        } else {
+            $error = 'Invalid email or password.';
+        }
+        
+        $stmt->close();
+    }
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login - Sekuwa Kerner</title>
+</head>
+<body>
+    <main class="auth-page">
+        <div class="auth-box">
+            <h1>Welcome Back!</h1>
+            
+            <?php if ($error): ?>
+                <div class="alert alert-error">❌ <?php echo $error; ?></div>
+            <?php endif; ?>
+            
+            <form action="login.php" method="POST" class="auth-form">
+                <div class="form-group">
+                    <label for="email">📧 Email Address</label>
+                    <input type="email" id="email" name="email" 
+                           value="<?php echo htmlspecialchars($email); ?>" required>
+                </div>
+                
+                <div class="form-group">
+                    <label for="password">🔒 Password</label>
+                    <input type="password" id="password" name="password" required>
+                </div>
+                
+                <button type="submit" class="btn btn-primary btn-block">🔥 Sign In</button>
+            </form>
+            
+            <p>Don't have an account? <a href="register.php">Create one here</a></p>
+            
+            <div class="demo-credentials">
+                <p><strong>🧪 Demo Accounts:</strong></p>
+                <p>👨‍💼 Admin: admin@sekuwakerner.com / password</p>
+                <p>👤 Customer: ram@example.com / password</p>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
+```
+
+---
+
+## 6. Admin and Customer Dashboard
+
+### Admin Dashboard
+
+The admin dashboard provides a comprehensive overview of the business with:
+
+- **Statistics Overview**: Total orders, products, revenue, and customer count
+- **Today's Statistics**: Today's orders, revenue, and pending orders
+- **Recent Orders Table**: Latest 5 orders with status
+- **Featured Products Table**: Currently featured products
+
+**PHP Implementation (admin/dashboard.php):**
+
+```php
+<?php
+require_once 'admin_auth.php';
+
+// Get admin statistics
+function getAdminStats($conn) {
+    $stats = [];
+    
+    // Total orders
+    $result = $conn->query("SELECT COUNT(*) as count FROM orders");
+    $stats['total_orders'] = $result->fetch_assoc()['count'];
+    
+    // Total products
+    $result = $conn->query("SELECT COUNT(*) as count FROM products");
+    $stats['total_products'] = $result->fetch_assoc()['count'];
+    
+    // Total revenue (from delivered orders)
+    $result = $conn->query("SELECT COALESCE(SUM(total_price), 0) as total FROM orders WHERE status = 'Delivered'");
+    $stats['total_revenue'] = $result->fetch_assoc()['total'];
+    
+    // Total customers
+    $result = $conn->query("SELECT COUNT(*) as count FROM users WHERE role = 'customer'");
+    $stats['total_customers'] = $result->fetch_assoc()['count'];
+    
+    // Today's orders
+    $result = $conn->query("SELECT COUNT(*) as count FROM orders WHERE DATE(created_at) = CURDATE()");
+    $stats['today_orders'] = $result->fetch_assoc()['count'];
+    
+    // Today's revenue
+    $result = $conn->query("SELECT COALESCE(SUM(total_price), 0) as total FROM orders 
+                            WHERE DATE(created_at) = CURDATE() AND status != 'Cancelled'");
+    $stats['today_revenue'] = $result->fetch_assoc()['total'];
+    
+    // Pending orders
+    $result = $conn->query("SELECT COUNT(*) as count FROM orders WHERE status = 'Pending'");
+    $stats['pending_orders'] = $result->fetch_assoc()['count'];
+    
+    return $stats;
+}
+
+$stats = getAdminStats($conn);
+
+// Fetch recent orders with JOIN
+$recent_orders = $conn->query("SELECT o.*, u.name as customer_name 
+                               FROM orders o 
+                               JOIN users u ON o.user_id = u.id 
+                               ORDER BY o.created_at DESC 
+                               LIMIT 5");
+?>
+
+<!-- HTML Table for Recent Orders -->
+<table class="admin-table">
+    <thead>
+        <tr>
+            <th>Order ID</th>
+            <th>Customer</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Date</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php if ($recent_orders->num_rows > 0): ?>
+            <?php while ($order = $recent_orders->fetch_assoc()): ?>
+                <tr>
+                    <td>#<?php echo str_pad($order['id'], 6, '0', STR_PAD_LEFT); ?></td>
+                    <td><?php echo htmlspecialchars($order['customer_name']); ?></td>
+                    <td>Rs. <?php echo number_format($order['total_price'], 2); ?></td>
+                    <td>
+                        <span class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $order['status'])); ?>">
+                            <?php echo $order['status']; ?>
+                        </span>
+                    </td>
+                    <td><?php echo date('M j, Y', strtotime($order['created_at'])); ?></td>
+                </tr>
+            <?php endwhile; ?>
+        <?php else: ?>
+            <tr>
+                <td colspan="5" class="text-center">No orders yet</td>
+            </tr>
+        <?php endif; ?>
+    </tbody>
+</table>
+```
+
+---
+
+### Customer Dashboard
+
+The customer dashboard allows customers to:
+
+- View profile information
+- See order statistics (total orders, total spent, pending, completed)
+- View recent orders with tracking links
+
+**PHP Implementation (customer/dashboard.php):**
+
+```php
+<?php
+session_start();
+require_once '../config/db.php';
+
+// Check if user is logged in
+if (!isLoggedIn()) {
+    setFlashMessage('error', 'Please login to access your account.');
+    redirect('../auth/login.php');
+}
+
+$user_id = getCurrentUserId();
+
+// Get user details
+$user_stmt = $conn->prepare("SELECT * FROM users WHERE id = ?");
+$user_stmt->bind_param("i", $user_id);
+$user_stmt->execute();
+$user = $user_stmt->get_result()->fetch_assoc();
+
+// Get order statistics using aggregate functions
+$stats_query = $conn->prepare("SELECT 
+    COUNT(*) as total_orders,
+    COALESCE(SUM(CASE WHEN status != 'Cancelled' THEN total_price ELSE 0 END), 0) as total_spent,
+    COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_orders,
+    COUNT(CASE WHEN status = 'Delivered' THEN 1 END) as completed_orders
+    FROM orders WHERE user_id = ?");
+$stats_query->bind_param("i", $user_id);
+$stats_query->execute();
+$stats = $stats_query->get_result()->fetch_assoc();
+
+// Get recent orders
+$recent_orders = $conn->prepare("SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT 5");
+$recent_orders->bind_param("i", $user_id);
+$recent_orders->execute();
+$orders_result = $recent_orders->get_result();
+?>
+
+<!-- Recent Orders Table -->
+<table class="orders-table">
+    <thead>
+        <tr>
+            <th>Order ID</th>
+            <th>Date</th>
+            <th>Total</th>
+            <th>Status</th>
+            <th>Action</th>
+        </tr>
+    </thead>
+    <tbody>
+        <?php while ($order = $orders_result->fetch_assoc()): ?>
+            <tr>
+                <td>#<?php echo str_pad($order['id'], 6, '0', STR_PAD_LEFT); ?></td>
+                <td><?php echo date('M j, Y', strtotime($order['created_at'])); ?></td>
+                <td>Rs. <?php echo number_format($order['total_price'], 2); ?></td>
+                <td>
+                    <span class="status-badge status-<?php echo strtolower(str_replace(' ', '-', $order['status'])); ?>">
+                        <?php echo $order['status']; ?>
+                    </span>
+                </td>
+                <td>
+                    <a href="order_status.php?id=<?php echo $order['id']; ?>" class="btn btn-small">Track</a>
+                </td>
+            </tr>
+        <?php endwhile; ?>
+    </tbody>
+</table>
+```
+
+---
+
+## 7. Summary
+
+### Project Overview
+
+The **Sekuwa Kerner** e-commerce platform is a fully functional food ordering system built with PHP and MySQL. The project demonstrates practical implementation of database concepts and web development skills.
+
+### Key Accomplishments
+
+| Component | Implementation |
+|-----------|----------------|
+| **Database Design** | 6 normalized tables with proper relationships |
+| **User Authentication** | Secure registration and login with password hashing |
+| **Admin Panel** | Complete CRUD operations for products and order management |
+| **Customer Interface** | Product browsing, cart, checkout, and order tracking |
+| **Security** | Prepared statements for SQL injection prevention |
+| **Performance** | Database indexes for faster queries |
+
+### Database Statistics
+
+- **Total Tables**: 6
+- **Total Relationships**: 5 (using foreign keys)
+- **Primary Keys**: 6
+- **Foreign Keys**: 6
+- **Indexes**: 4 (for performance optimization)
+
+### SQL Operations Implemented
+
+| Operation | Count | Examples |
+|-----------|-------|----------|
+| **CREATE** | Multiple | User registration, order placement, product addition |
+| **READ** | Multiple | Product listing, order history, dashboard statistics |
+| **UPDATE** | Multiple | Product editing, order status update, cart management |
+| **DELETE** | Multiple | Product deletion, cart item removal |
+
+### Technologies Summary
+
+- **Backend**: PHP 8.x with MySQLi extension
+- **Database**: MySQL with InnoDB engine
+- **Frontend**: HTML5, CSS3, JavaScript
+- **Security**: Password hashing (bcrypt), prepared statements, input sanitization
+
+---
+
+## 8. Conclusion
+
+### Learning Outcomes
+
+Through this project, the following learning outcomes were achieved:
+
+1. **Database Design**: Understanding of ER diagrams, relational schemas, and normalization principles
+
+2. **SQL Proficiency**: Practical experience with DDL (CREATE, ALTER) and DML (INSERT, SELECT, UPDATE, DELETE) commands
+
+3. **PHP-MySQL Integration**: Implementation of database connectivity using MySQLi with prepared statements
+
+4. **Security Best Practices**: Implementation of password hashing, SQL injection prevention, and input validation
+
+5. **Web Application Architecture**: Understanding of MVC-like patterns, session management, and user authentication
+
+### Future Enhancements
+
+The system can be further improved with:
+
+- Email notifications for order updates
+- Real-time order tracking with WebSockets
+- Mobile-responsive Progressive Web App (PWA)
+- Integration with actual payment gateways (eSewa, Khalti APIs)
+- Admin analytics dashboard with charts
+- Customer reviews and ratings system
+
+### Acknowledgments
+
+This project was developed as part of database coursework to demonstrate practical implementation of database concepts in a real-world web application scenario.
+
+---
+
+**Project Repository Structure:**
+
+```
+sekuwa-kerner/
+├── admin/                 # Admin dashboard files
+│   ├── add_product.php
+│   ├── admin_auth.php
+│   ├── dashboard.php
+│   ├── delete_product.php
+│   ├── edit_product.php
+│   ├── orders.php
+│   ├── products.php
+│   └── reports.php
+├── assets/                # Static assets
+│   ├── css/style.css
+│   ├── images/
+│   └── js/script.js
+├── auth/                  # Authentication files
+│   ├── login.php
+│   ├── logout.php
+│   └── register.php
+├── cart/                  # Shopping cart files
+│   ├── cart.php
+│   ├── checkout.php
+│   ├── payment.php
+│   └── place_order.php
+├── config/                # Configuration files
+│   └── db.php
+├── customer/              # Customer dashboard files
+│   ├── dashboard.php
+│   ├── orders.php
+│   └── order_status.php
+├── database.sql           # Complete database schema
+├── index.php              # Homepage
+├── products.php           # Product listing page
+└── product_details.php    # Single product page
+```
+
+---
+
+*Report generated for Sekuwa Kerner - Nepali Food Ordering Platform*
+*© 2026 College Project*
+
