@@ -39,7 +39,7 @@ $user = $user_stmt->get_result()->fetch_assoc();
 // Get order statistics
 $stats_query = $conn->prepare("SELECT 
     COUNT(*) as total_orders,
-    COALESCE(SUM(total_price), 0) as total_spent,
+    COALESCE(SUM(CASE WHEN status != 'Cancelled' THEN total_price ELSE 0 END), 0) as total_spent,
     COUNT(CASE WHEN status = 'Pending' THEN 1 END) as pending_orders,
     COUNT(CASE WHEN status = 'Delivered' THEN 1 END) as completed_orders
     FROM orders WHERE user_id = ?");

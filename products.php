@@ -7,12 +7,12 @@
 session_start();
 require_once 'config/db.php';
 
-// Get filter parameters
-$category_filter = isset($_GET['category']) ? intval($_GET['category']) : 0;
-$search_query = isset($_GET['search']) ? sanitize($conn, $_GET['search']) : '';
-$sort_by = isset($_GET['sort']) ? sanitize($conn, $_GET['sort']) : 'name';
-$min_price = isset($_GET['min_price']) ? floatval($_GET['min_price']) : 0;
-$max_price = isset($_GET['max_price']) ? floatval($_GET['max_price']) : 10000;
+// Get filter parameters - only set if actually provided and not empty
+$category_filter = isset($_GET['category']) && $_GET['category'] !== '' ? intval($_GET['category']) : 0;
+$search_query = isset($_GET['search']) && $_GET['search'] !== '' ? sanitize($conn, $_GET['search']) : '';
+$sort_by = isset($_GET['sort']) && $_GET['sort'] !== '' ? sanitize($conn, $_GET['sort']) : 'name';
+$min_price = isset($_GET['min_price']) && $_GET['min_price'] !== '' ? floatval($_GET['min_price']) : null;
+$max_price = isset($_GET['max_price']) && $_GET['max_price'] !== '' ? floatval($_GET['max_price']) : null;
 
 // Build SQL query
 $sql = "SELECT p.*, c.name as category_name 
@@ -37,10 +37,18 @@ if (!empty($search_query)) {
     $types .= "ss";
 }
 
-$sql .= " AND p.price >= ? AND p.price <= ?";
-$params[] = $min_price;
-$params[] = $max_price;
-$types .= "dd";
+// Only apply price filters if user actually set them
+if ($min_price !== null) {
+    $sql .= " AND p.price >= ?";
+    $params[] = $min_price;
+    $types .= "d";
+}
+
+if ($max_price !== null) {
+    $sql .= " AND p.price <= ?";
+    $params[] = $max_price;
+    $types .= "d";
+}
 
 switch ($sort_by) {
     case 'price_low': $sql .= " ORDER BY p.price ASC"; break;
@@ -147,11 +155,15 @@ if ($category_filter > 0) {
             <div class="products-layout">
                 <!-- Filters Sidebar -->
                 <aside class="filters-sidebar">
-                    <form action="products.php" method="GET" class="filter-form">
+                    <form action="products.php" method="GET" class="filter-form" id="filterForm">
+                        <?php if (!empty($search_query)): ?>
+                            <input type="hidden" name="search" value="<?php echo htmlspecialchars($search_query); ?>">
+                        <?php endif; ?>
+
                         <div class="filter-group">
                             <h3>🍽️ Categories</h3>
-                            <select name="category" onchange="this.form.submit()">
-                                <option value="0">All Categories</option>
+                            <select name="category" id="categoryFilter">
+                                <option value="">All Categories</option>
                                 <?php 
                                 $categories_result->data_seek(0);
                                 while ($category = $categories_result->fetch_assoc()): 
@@ -167,17 +179,17 @@ if ($category_filter > 0) {
                         <div class="filter-group">
                             <h3>💰 Price Range</h3>
                             <div class="price-inputs">
-                                <input type="number" name="min_price" placeholder="Min" 
-                                       value="<?php echo $min_price > 0 ? $min_price : ''; ?>" min="0">
+                                <input type="number" name="min_price" placeholder="Min Rs" 
+                                       value="<?php echo $min_price !== null ? $min_price : ''; ?>" min="0" step="1">
                                 <span>to</span>
-                                <input type="number" name="max_price" placeholder="Max" 
-                                       value="<?php echo $max_price < 10000 ? $max_price : ''; ?>" min="0">
+                                <input type="number" name="max_price" placeholder="Max Rs" 
+                                       value="<?php echo $max_price !== null ? $max_price : ''; ?>" min="0" step="1">
                             </div>
                         </div>
 
                         <div class="filter-group">
                             <h3>📊 Sort By</h3>
-                            <select name="sort" onchange="this.form.submit()">
+                            <select name="sort" id="sortFilter">
                                 <option value="name" <?php echo $sort_by == 'name' ? 'selected' : ''; ?>>Name (A-Z)</option>
                                 <option value="price_low" <?php echo $sort_by == 'price_low' ? 'selected' : ''; ?>>Price: Low → High</option>
                                 <option value="price_high" <?php echo $sort_by == 'price_high' ? 'selected' : ''; ?>>Price: High → Low</option>
@@ -185,13 +197,33 @@ if ($category_filter > 0) {
                             </select>
                         </div>
 
-                        <?php if (!empty($search_query)): ?>
-                            <input type="hidden" name="search" value="<?php echo htmlspecialchars($search_query); ?>">
-                        <?php endif; ?>
-
                         <button type="submit" class="btn btn-primary btn-block">Apply Filters</button>
-                        <a href="products.php" class="btn btn-outline btn-block" style="margin-top: 0.5rem;">Clear All</a>
+                        
+                        <?php 
+                        // Show clear button only if any filter is active
+                        $has_active_filters = $category_filter > 0 || $min_price !== null || $max_price !== null || $sort_by !== 'name';
+                        if ($has_active_filters): 
+                        ?>
+                            <a href="products.php<?php echo !empty($search_query) ? '?search=' . urlencode($search_query) : ''; ?>" 
+                               class="btn btn-outline btn-block" style="margin-top: 0.5rem;">Clear Filters</a>
+                        <?php endif; ?>
                     </form>
+
+                    <?php if (!empty($search_query)): ?>
+                        <div class="active-search" style="margin-top: 1rem; padding: 0.75rem; background: var(--bg-card); border-radius: 8px;">
+                            <p style="margin: 0; font-size: 0.9rem; color: var(--text-muted);">
+                                🔍 Searching: <strong style="color: var(--text-primary);"><?php echo htmlspecialchars($search_query); ?></strong>
+                            </p>
+                            <a href="products.php<?php 
+                                $clear_search_params = [];
+                                if ($category_filter > 0) $clear_search_params[] = 'category=' . $category_filter;
+                                if ($min_price !== null) $clear_search_params[] = 'min_price=' . $min_price;
+                                if ($max_price !== null) $clear_search_params[] = 'max_price=' . $max_price;
+                                if ($sort_by !== 'name') $clear_search_params[] = 'sort=' . $sort_by;
+                                echo !empty($clear_search_params) ? '?' . implode('&', $clear_search_params) : '';
+                            ?>" style="font-size: 0.85rem; color: var(--primary);">✕ Clear search</a>
+                        </div>
+                    <?php endif; ?>
                 </aside>
 
                 <!-- Products Grid -->
@@ -265,5 +297,33 @@ if ($category_filter > 0) {
     </footer>
 
     <script src="assets/js/script.js"></script>
+    <script>
+        // Auto-submit on category/sort change while preserving all filter values
+        document.getElementById('categoryFilter')?.addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+        
+        document.getElementById('sortFilter')?.addEventListener('change', function() {
+            document.getElementById('filterForm').submit();
+        });
+
+        // Remove empty fields before submit to keep URL clean
+        document.getElementById('filterForm')?.addEventListener('submit', function(e) {
+            const form = this;
+            const inputs = form.querySelectorAll('input, select');
+            
+            inputs.forEach(input => {
+                // Skip hidden inputs (like search)
+                if (input.type === 'hidden') return;
+                
+                // Disable empty inputs so they don't appear in URL
+                if (input.value === '' || input.value === '0' || 
+                    (input.name === 'sort' && input.value === 'name') ||
+                    (input.name === 'category' && input.value === '')) {
+                    input.disabled = true;
+                }
+            });
+        });
+    </script>
 </body>
 </html>

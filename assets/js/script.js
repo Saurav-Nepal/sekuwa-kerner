@@ -486,9 +486,18 @@ function animateValue(element) {
  */
 function initLoadingStates() {
     document.querySelectorAll('form').forEach(form => {
-        form.addEventListener('submit', function() {
-            const submitBtn = form.querySelector('button[type="submit"]');
+        form.addEventListener('submit', function(e) {
+            const submitBtn = form.querySelector('button[type="submit"]:focus, button[type="submit"][name]');
             if (submitBtn && !submitBtn.classList.contains('no-loading')) {
+                // Add a hidden input to preserve the button's name/value since disabling removes it from POST
+                if (submitBtn.name) {
+                    const hiddenInput = document.createElement('input');
+                    hiddenInput.type = 'hidden';
+                    hiddenInput.name = submitBtn.name;
+                    hiddenInput.value = submitBtn.value || '1';
+                    form.appendChild(hiddenInput);
+                }
+                
                 const originalText = submitBtn.innerHTML;
                 submitBtn.innerHTML = `<span class="spinner"></span> Processing...`;
                 submitBtn.disabled = true;
@@ -760,10 +769,37 @@ function animateCounter(element, start, end, duration) {
 
 // Animate stat numbers on page load
 document.querySelectorAll('.stat-info h3').forEach(stat => {
-    const value = parseInt(stat.textContent.replace(/[^0-9]/g, ''));
-    if (!isNaN(value) && value > 0) {
-        stat.textContent = '0';
-        setTimeout(() => animateCounter(stat, 0, value, 1500), 500);
+    const text = stat.textContent.trim();
+    // Extract prefix (like "Rs ") and the numeric part
+    const match = text.match(/^([^\d]*)([\d,]+(?:\.\d+)?)(.*)$/);
+    if (match) {
+        const prefix = match[1]; // e.g., "Rs "
+        const numericStr = match[2].replace(/,/g, ''); // Remove commas for parsing
+        const suffix = match[3]; // e.g., any trailing text
+        const value = parseFloat(numericStr);
+        const hasDecimals = numericStr.includes('.');
+        
+        if (!isNaN(value) && value > 0) {
+            stat.textContent = prefix + '0' + suffix;
+            setTimeout(() => {
+                let startTimestamp = null;
+                const duration = 1500;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    const currentValue = progress * value;
+                    // Format with decimals if original had decimals
+                    const formatted = hasDecimals 
+                        ? currentValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                        : Math.floor(currentValue).toLocaleString();
+                    stat.textContent = prefix + formatted + suffix;
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }, 500);
+        }
     }
 });
 
